@@ -8,6 +8,7 @@ from pulp_glue.ansible.context import (
     PulpAnsibleRepositoryContext,
     PulpAnsibleRoleContext,
     PulpAnsibleRoleRemoteContext,
+    PulpSigstoreSigningServiceContext,
 )
 from pulp_glue.common.context import (
     EntityFieldDefinition,
@@ -82,6 +83,16 @@ def _signing_service_callback(ctx: click.Context, param: click.Parameter, value:
         pulp_ctx = ctx.find_object(PulpCLIContext)
         assert pulp_ctx is not None
         value = PulpSigningServiceContext(pulp_ctx, entity={"name": value})
+    return value
+
+
+def _sigstore_signing_service_callback(
+    ctx: click.Context, param: click.Parameter, value: Any
+) -> Any:
+    if value:
+        pulp_ctx = ctx.find_object(PulpCLIContext)
+        assert pulp_ctx is not None
+        value = PulpSigstoreSigningServiceContext(pulp_ctx, entity={"name": value})
     return value
 
 
@@ -226,16 +237,38 @@ def sync(
 @href_option
 @repository_lookup_option
 @click.option("--signing-service", required=True, callback=_signing_service_callback)
+@click.option(
+    "--sigstore-signing-service", required=True, callback=_sigstore_signing_service_callback
+)
 @click.option("--content-units", callback=load_json_callback)
 @pass_repository_context
 def sign(
     repository_ctx: PulpRepositoryContext,
-    signing_service: PulpSigningServiceContext,
+    signing_service: Optional[PulpSigningServiceContext],
+    sigstore_signing_service: Optional[PulpSigstoreSigningServiceContext],
     content_units: Optional[List[str]],
 ) -> None:
     """Sign the collections in the repository using the signing service specified."""
     if content_units is None:
         content_units = ["*"]
-    body = {"content_units": content_units, "signing_service": signing_service}
+    if signing_service and sigstore_signing_service:
+        raise click.UsageError(
+            "Mismatched arguments: only one of --signing-service or --sigstore-signing-service can be specified.",
+            repository_ctx,
+        )
+    if not signing_service and not sigstore_signing_service:
+        raise click.UsageError(
+            "Missing argument: one of --signing-service or --sigstore-signing-service must be specified.",
+            repository_ctx,
+        )
+    signing_service_body = (
+        {"signing_service": signing_service}
+        if signing_service
+        else {"sigstore_signing_service": sigstore_signing_service}
+    )
+    body = {"content_units": content_units, **signing_service_body}
     parameters = {repository_ctx.HREF: repository_ctx.pulp_href}
-    repository_ctx.call("sign", parameters=parameters, body=body)
+    if signing_service:
+        repository_ctx.call("sign", parameters=parameters, body=body)
+    elif sigstore_signing_service:
+        repository_ctx.call("sigstore_sign", parameters=parameters, body=body)

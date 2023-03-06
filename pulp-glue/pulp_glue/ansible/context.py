@@ -5,6 +5,7 @@ from pulp_glue.common.context import (
     PluginRequirement,
     PulpContentContext,
     PulpDistributionContext,
+    PulpEntityContext,
     PulpRemoteContext,
     PulpRepositoryContext,
     PulpRepositoryVersionContext,
@@ -51,6 +52,36 @@ class PulpAnsibleCollectionVersionSignatureContext(PulpContentContext):
     ) -> Any:
         self.pulp_ctx.needs_plugin(
             PluginRequirement("ansible", min="0.13.0", feature=_("collection version creation"))
+        )
+        return super().create(body=body, parameters=parameters, non_blocking=non_blocking)
+
+
+class PulpSigstoreSigningServiceContext(PulpEntityContext):
+    ENTITY = _("sigstore signing service")
+    ENTITIES = _("sigstore signing services")
+    HREF = "sigstore_signing_service_href"
+    ID_PREFIX = "sigstore_signing_services"
+
+
+class PulpAnsibleCollectionVersionSigstoreSignatureContext(PulpContentContext):
+    ENTITY = _("ansible collection version sigstore signature")
+    ENTITIES = _("ansible collection version sigstore signatures")
+    HREF = _("ansible_collection_version_sigstore_signature_href")
+    ID_PREFIX = "content_ansible_collection_sigstore_signatures"
+    NEEDS_PLUGINS = [
+        PluginRequirement("ansible", min="0.12.0")
+    ]  # TODO: adapt to correct version number
+
+    def create(
+        self,
+        body: EntityDefinition,
+        parameters: Optional[Mapping[str, Any]] = None,
+        non_blocking: bool = False,
+    ) -> Any:
+        self.pulp_ctx.needs_plugin(
+            PluginRequirement(
+                "ansible", min="0.13.0", feature=_("collection version creation")
+            )  # TODO: adapt to correct version number
         )
         return super().create(body=body, parameters=parameters, non_blocking=non_blocking)
 
